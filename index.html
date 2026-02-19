@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ほしの おんがく を つくろう</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&display=swap');
+
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background: linear-gradient(to top, #1e40af 0%, #020617 100%);
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+            color: white;
+            height: 100vh;
+        }
+
+        .star-btn {
+            transition: transform 0.2s ease-out;
+        }
+
+        /* 背景のキラキラ星 */
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.2; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.2); }
+        }
+
+        .bg-star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle var(--duration) ease-in-out infinite;
+            animation-delay: var(--delay);
+            z-index: 0;
+        }
+
+        /* 流れ星 */
+        @keyframes shooting-star {
+            0% { transform: translateX(0) translateY(0) rotate(-35deg) scale(0); opacity: 0; }
+            10% { opacity: 1; scale(1); }
+            20% { transform: translateX(-500px) translateY(350px) rotate(-35deg) scale(1); opacity: 0; }
+            100% { transform: translateX(-500px) translateY(350px) rotate(-35deg) scale(0); opacity: 0; }
+        }
+
+        .shooting-star {
+            position: absolute;
+            width: 150px;
+            height: 2px;
+            background: linear-gradient(90deg, white, transparent);
+            animation: shooting-star 10s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* スクロールバー非表示 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="flex flex-col items-center p-6 min-h-screen">
+
+    <!-- 背景装飾 -->
+    <div id="star-container" class="fixed inset-0 pointer-events-none"></div>
+
+    <!-- ヘッダー -->
+    <div class="w-full max-w-[95vw] flex justify-between items-center mb-2 z-50">
+        <div class="flex items-center gap-6">
+            <h1 class="text-4xl font-black tracking-tighter drop-shadow-lg">ほしの おんがく</h1>
+            
+            <!-- 楽器選択エリア -->
+            <div class="flex items-center bg-white/10 rounded-full p-1 border border-white/30 backdrop-blur-sm">
+                <span class="ml-3 mr-2 text-sm font-bold">おと:</span>
+                <select id="instrumentSelect" class="bg-blue-900/80 text-white rounded-full px-4 py-1 font-bold border border-white/50 focus:outline-none cursor-pointer hover:bg-blue-800">
+                    <option value="sine">💻 パソコン</option>
+                    <option value="melodica">🎹 けんばんハーモニカ</option>
+                    <option value="piano">🎹 ピアノ（グランド）</option>
+                    <option value="flute">🪈 ふえ</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="flex gap-4">
+            <!-- さいしょからボタン（アイコン化） -->
+            <button id="resetBtn" title="さいしょから" class="w-14 h-14 flex items-center justify-center bg-white/20 hover:bg-white/40 rounded-full border-2 border-white transition-all group">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8 group-hover:-rotate-180 transition-transform duration-500">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                </svg>
+            </button>
+            <button id="playBtn" disabled class="px-10 py-2 bg-slate-500 opacity-50 rounded-full font-black text-2xl transition-all shadow-xl text-blue-900 border-b-4 border-yellow-600 active:translate-y-1">
+                さいせい
+            </button>
+        </div>
+    </div>
+
+    <!-- メインステージ（横長配置） -->
+    <div id="stage" class="relative w-full max-w-[95vw] flex-grow flex items-center justify-center">
+        
+        <!-- 流れ星 -->
+        <div class="shooting-star" style="top: 15%; right: 10%; animation-delay: 2s;"></div>
+        <div class="shooting-star" style="top: 40%; right: 5%; animation-delay: 7s;"></div>
+
+        <!-- スタート：位置を調整（top-20） -->
+        <div class="absolute left-4 top-20 flex flex-col items-center z-20">
+            <div class="text-orange-400 text-5xl mb-1">🚀</div>
+            <div class="bg-orange-500 text-white text-lg px-3 py-1 rounded-full font-black border-2 border-white">スタート</div>
+        </div>
+        
+        <!-- ゴール：位置を調整（top-20） -->
+        <div class="absolute right-4 top-20 flex flex-col items-center z-20">
+            <div class="text-blue-300 text-5xl mb-1">🛸</div>
+            <div class="bg-blue-800 text-white text-lg px-3 py-1 rounded-full font-black border-2 border-white">ゴール</div>
+        </div>
+
+        <!-- 接続線（星の下） -->
+        <svg id="lines-svg" class="absolute inset-0 w-full h-full pointer-events-none z-0"></svg>
+
+        <!-- 星ボタンレイヤー -->
+        <div id="stars-layer" class="absolute inset-0 z-10 w-full h-full"></div>
+    </div>
+
+    <!-- 演奏リスト（位置を上に調整：-mt-12） -->
+    <div class="-mt-12 w-full max-w-[95vw] bg-white/10 rounded-[32px] p-4 flex items-center gap-6 border-4 border-white/20 overflow-x-auto no-scrollbar min-h-[100px] z-50">
+        <div class="shrink-0 text-yellow-400">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        </div>
+        <div id="sequence-list" class="flex gap-3 items-center flex-wrap">
+            <!-- 文字列なし -->
+        </div>
+    </div>
+
+    <script>
+        const NOTES = { 'ど': 261.63, 'れ': 293.66, 'み': 329.63, 'ふぁ': 349.23, 'そ': 391.99, 'ら': 440.00, 'し': 493.88, 'ど(高)': 523.25 };
+
+        const FIXED_STARS = [
+            { id: 101, note: 'そ', col: 0, row: 1 }, { id: 102, note: 'み', col: 0, row: 3 }, { id: 103, note: 'ど', col: 0, row: 5 },
+            { id: 201, note: 'ら', col: 1, row: 0 }, { id: 202, note: 'ふぁ', col: 1, row: 2 }, { id: 203, note: 'れ', col: 1, row: 4 },
+            { id: 301, note: 'そ', col: 2, row: 1 }, { id: 302, note: 'み', col: 2, row: 3 },
+            { id: 401, note: 'ら', col: 3, row: 0 }, { id: 402, note: 'ふぁ', col: 3, row: 2 }, { id: 403, note: 'れ', col: 3, row: 4 },
+            { id: 501, note: 'そ', col: 4, row: 1 }, { id: 502, note: 'み', col: 4, row: 3 }, { id: 503, note: 'ど', col: 4, row: 5 },
+            { id: 601, note: 'そ', col: 5, row: 1 }, { id: 602, note: 'ふぁ', col: 5, row: 2 }, { id: 603, note: 'れ', col: 5, row: 4 },
+            { id: 701, note: 'そ', col: 6, row: 1 }, { id: 702, note: 'み', col: 6, row: 3 }, { id: 703, note: 'ど', col: 6, row: 5 },
+        ];
+
+        let sequence = [];
+        let isPlaying = false;
+        let audioCtx = null;
+        let currentInstrument = 'sine';
+
+        // 扇形配置の計算ロジック
+        const getPos = (col, row) => {
+            const centerX = 50;   
+            const baseY = 15;     
+            const rowHeight = 11; 
+            const baseSpacing = 13; 
+
+            const spreadFactor = 1.1 - (row * 0.04); 
+            const archOffset = Math.pow(Math.abs(col - 3), 1.8) * 1.2; 
+
+            const x = centerX + (col - 3) * baseSpacing * spreadFactor;
+            const y = baseY + row * rowHeight + archOffset;
+
+            return { x, y };
+        };
+
+        // 背景の星を生成
+        function initBackground() {
+            const container = document.getElementById('star-container');
+            for (let i = 0; i < 80; i++) {
+                const star = document.createElement('div');
+                star.className = 'bg-star';
+                const size = Math.random() * 2 + 1;
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                star.style.left = `${Math.random() * 100}%`;
+                star.style.top = `${Math.random() * 100}%`;
+                star.style.setProperty('--delay', `${Math.random() * 5}s`);
+                star.style.setProperty('--duration', `${Math.random() * 3 + 2}s`);
+                container.appendChild(star);
+            }
+        }
+
+        function createLines() {
+            const svg = document.getElementById('lines-svg');
+            svg.innerHTML = ''; 
+            FIXED_STARS.forEach((s1, i) => {
+                FIXED_STARS.slice(i + 1).forEach(s2 => {
+                    const colDiff = Math.abs(s1.col - s2.col);
+                    const rowDiff = Math.abs(s1.row - s2.row);
+                    const isDiagonal = (colDiff === 1 && rowDiff === 1);
+                    const isSoLine = (s1.note === 'そ' && s2.note === 'そ' && s1.row === 1 && s2.row === 1 && colDiff === 1);
+
+                    if (isDiagonal || isSoLine) {
+                        const p1 = getPos(s1.col, s1.row);
+                        const p2 = getPos(s2.col, s2.row);
+                        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                        line.setAttribute("x1", `${p1.x}%`); line.setAttribute("y1", `${p1.y}%`);
+                        line.setAttribute("x2", `${p2.x}%`); line.setAttribute("y2", `${p2.y}%`);
+                        line.setAttribute("stroke", "white");
+                        line.setAttribute("stroke-width", "1");
+                        line.setAttribute("stroke-opacity", "0.3");
+                        line.setAttribute("stroke-dasharray", "4 4");
+                        svg.appendChild(line);
+                    }
+                });
+            });
+        }
+
+        // 高度な音響生成機能
+        function playTone(freq) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const now = audioCtx.currentTime;
+            const duration = 1.5; // 余韻を含めた全体の長さ
+
+            // メインのGainNode（全体の音量制御）
+            const masterGain = audioCtx.createGain();
+            masterGain.connect(audioCtx.destination);
+
+            switch(currentInstrument) {
+                case 'piano': // グランドピアノ風
+                    createOscillator(freq, 'triangle', now, 0.6, masterGain);
+                    createOscillator(freq + 1, 'triangle', now, 0.4, masterGain); 
+                    createOscillator(freq * 2, 'sine', now, 0.1, masterGain); 
+
+                    masterGain.gain.setValueAtTime(0, now);
+                    masterGain.gain.linearRampToValueAtTime(1.0, now + 0.02);
+                    masterGain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+                    break;
+                
+                case 'melodica': // けんばんハーモニカ
+                    const oscMel = audioCtx.createOscillator();
+                    oscMel.type = 'sawtooth';
+                    oscMel.frequency.setValueAtTime(freq, now);
+                    
+                    oscMel.connect(masterGain);
+                    
+                    masterGain.gain.setValueAtTime(0, now);
+                    masterGain.gain.linearRampToValueAtTime(0.3, now + 0.05); // 息の入り
+                    masterGain.gain.setValueAtTime(0.3, now + 0.5); // 持続
+                    masterGain.gain.linearRampToValueAtTime(0.01, now + 0.7); // リリース
+                    
+                    oscMel.start(now);
+                    oscMel.stop(now + 0.7);
+                    break;
+
+                case 'flute': // 笛
+                    const oscFlu = audioCtx.createOscillator();
+                    oscFlu.type = 'sine';
+                    oscFlu.frequency.setValueAtTime(freq, now);
+                    
+                    oscFlu.connect(masterGain);
+                    
+                    masterGain.gain.setValueAtTime(0, now);
+                    masterGain.gain.linearRampToValueAtTime(0.4, now + 0.1); 
+                    masterGain.gain.linearRampToValueAtTime(0.3, now + 0.4); 
+                    masterGain.gain.linearRampToValueAtTime(0.01, now + 0.6);
+                    
+                    oscFlu.start(now);
+                    oscFlu.stop(now + 0.6);
+                    break;
+
+                case 'sine':
+                default:
+                    const oscSine = audioCtx.createOscillator();
+                    oscSine.type = 'sine';
+                    oscSine.frequency.setValueAtTime(freq, now);
+                    
+                    oscSine.connect(masterGain);
+                    
+                    masterGain.gain.setValueAtTime(0, now);
+                    masterGain.gain.linearRampToValueAtTime(0.4, now + 0.03);
+                    masterGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    
+                    oscSine.start(now);
+                    oscSine.stop(now + 0.5);
+                    break;
+            }
+        }
+
+        // オシレーター生成ヘルパー関数
+        function createOscillator(freq, type, startTime, vol, outputNode) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, startTime);
+            gain.gain.value = vol;
+            osc.connect(gain);
+            gain.connect(outputNode);
+            osc.start(startTime);
+            osc.stop(startTime + 2.0); // 安全マージンをとって止める
+        }
+
+        function updateUI() {
+            const lastStar = sequence[sequence.length - 1];
+            const playBtn = document.getElementById('playBtn');
+            
+            if (sequence.length > 0 && !isPlaying) {
+                playBtn.disabled = false;
+                playBtn.classList.remove('bg-slate-500', 'opacity-50');
+                playBtn.classList.add('bg-yellow-400');
+            } else {
+                playBtn.disabled = true;
+                playBtn.classList.add('bg-slate-500', 'opacity-50');
+                playBtn.classList.remove('bg-yellow-400');
+            }
+
+            FIXED_STARS.forEach(star => {
+                const btn = document.getElementById(`star-${star.id}`);
+                const starIcon = btn.querySelector('.star-icon');
+                const label = btn.querySelector('.label');
+                
+                let selectable = false;
+                if (!isPlaying) {
+                    if (sequence.length === 0) {
+                        selectable = star.col === 0;
+                    } else {
+                        const isConnected = FIXED_STARS.some(s1 => {
+                            if (s1.id !== lastStar.id) return false;
+                            const colDiff = Math.abs(star.col - s1.col);
+                            const rowDiff = Math.abs(star.row - s1.row);
+                            return (colDiff === 1 && rowDiff === 1) || 
+                                   (star.note === 'そ' && s1.note === 'そ' && star.row === 1 && s1.row === 1 && colDiff === 1);
+                        });
+                        selectable = isConnected && star.col > lastStar.col;
+                    }
+                }
+
+                const isSelected = sequence.some(s => s.id === star.id);
+                btn.disabled = (!selectable && !isSelected) || isPlaying;
+                
+                starIcon.style.color = '';
+                starIcon.style.filter = '';
+
+                if (isSelected) {
+                    btn.className = 'star-btn absolute transform -translate-x-1/2 -translate-y-1/2 z-30 opacity-100';
+                    starIcon.className = "star-icon w-10 h-10 fill-current transition-all"; 
+                    starIcon.style.color = "#facc15"; 
+                    starIcon.style.filter = "drop-shadow(0 0 15px rgba(250, 204, 21, 0.8))"; 
+                    label.className = "label text-3xl font-black mt-1 text-yellow-400 transition-all"; 
+                } else if (selectable) {
+                    btn.className = 'star-btn absolute transform -translate-x-1/2 -translate-y-1/2 z-20 opacity-100';
+                    starIcon.className = "star-icon w-10 h-10 fill-current text-white transition-all"; 
+                    starIcon.style.filter = "drop-shadow(0 0 8px rgba(255, 255, 255, 0.6))"; 
+                    label.className = "label text-3xl font-black mt-1 text-white transition-all"; 
+                } else {
+                    btn.className = 'star-btn absolute transform -translate-x-1/2 -translate-y-1/2 z-0 opacity-30';
+                    starIcon.className = "star-icon w-10 h-10 fill-current text-white/40 transition-all"; 
+                    label.className = "label text-3xl font-black mt-1 text-white/40 transition-all"; 
+                }
+            });
+
+            const seqList = document.getElementById('sequence-list');
+            if (sequence.length === 0) {
+                seqList.innerHTML = ''; 
+            } else {
+                seqList.innerHTML = sequence.map(s => `
+                    <div class="px-5 py-2 rounded-2xl font-black text-2xl bg-white text-blue-800 border-2 border-yellow-400 shrink-0">
+                        ${s.note}
+                    </div>
+                `).join('');
+            }
+        }
+
+        function handleStarClick(star) {
+            if (sequence.some(s => s.id === star.id)) return;
+            playTone(NOTES[star.note]);
+            sequence.push(star);
+            updateUI();
+        }
+
+        async function playSequence() {
+            if (isPlaying || sequence.length === 0) return;
+            isPlaying = true;
+            updateUI();
+            const seqElements = document.getElementById('sequence-list').children;
+            for (let i = 0; i < sequence.length; i++) {
+                const star = sequence[i];
+                const starBtn = document.getElementById(`star-${star.id}`);
+                const seqBadge = seqElements[i];
+                const starIcon = starBtn.querySelector('.star-icon');
+
+                starBtn.style.transform = 'translate(-50%, -50%) scale(2.0)';
+                starIcon.style.filter = "drop-shadow(0 0 30px rgba(250, 204, 21, 1))";
+                
+                seqBadge.classList.add('bg-yellow-400', 'text-white');
+                
+                playTone(NOTES[star.note]);
+                await new Promise(r => setTimeout(r, 600));
+                
+                starBtn.style.transform = '';
+                starIcon.style.filter = "drop-shadow(0 0 15px rgba(250, 204, 21, 0.8))";
+                
+                seqBadge.classList.remove('bg-yellow-400', 'text-white');
+            }
+            isPlaying = false;
+            updateUI();
+        }
+
+        function initStars() {
+            const layer = document.getElementById('stars-layer');
+            layer.innerHTML = '';
+            FIXED_STARS.forEach(star => {
+                const pos = getPos(star.col, star.row);
+                const btn = document.createElement('button');
+                btn.id = `star-${star.id}`;
+                btn.className = 'star-btn absolute transform -translate-x-1/2 -translate-y-1/2';
+                btn.style.left = `${pos.x}%`; btn.style.top = `${pos.y}%`;
+                btn.innerHTML = `
+                    <div class="flex flex-col items-center">
+                        <div class="relative flex items-center justify-center">
+                            <svg viewBox="0 0 24 24" class="star-icon w-10 h-10 fill-current" stroke="currentColor" stroke-width="4" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        </div>
+                        <span class="label font-black text-3xl mt-1">${star.note}</span>
+                    </div>
+                `;
+                btn.onclick = () => handleStarClick(star);
+                layer.appendChild(btn);
+            });
+        }
+
+        window.onload = () => {
+            initBackground(); 
+            createLines(); initStars(); updateUI();
+            document.getElementById('resetBtn').onclick = () => { sequence = []; isPlaying = false; updateUI(); };
+            document.getElementById('playBtn').onclick = playSequence;
+            document.getElementById('instrumentSelect').onchange = (e) => {
+                currentInstrument = e.target.value;
+            };
+        };
+    </script>
+</body>
+</html>
